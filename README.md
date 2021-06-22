@@ -10,7 +10,7 @@ We propose a novel deep-learning-based approach that directly predicts whole hea
 
 Our method demonstrated promising performance of generating high-resolution and high-quality whole heart reconstructions. We are able to generate temporally-consistent and feature-corresponding surface mesh predictions for heart motion from CT or MR cine sequences.
 
-<img width="600" alt="examples" src="https://user-images.githubusercontent.com/31931939/122882003-993fa080-d2f0-11eb-8599-4d476b082f18.png"> <img width="280" alt="4dct2-_1_" src="https://user-images.githubusercontent.com/31931939/122882976-93968a80-d2f1-11eb-99b4-41a30a2ca2ee.gif">
+<img width="550" alt="examples" src="https://user-images.githubusercontent.com/31931939/122882003-993fa080-d2f0-11eb-8599-4d476b082f18.png"> <img width="260" alt="4dct2-_1_" src="https://user-images.githubusercontent.com/31931939/122882976-93968a80-d2f1-11eb-99b4-41a30a2ca2ee.gif">
 
 ## Dependencies
 
