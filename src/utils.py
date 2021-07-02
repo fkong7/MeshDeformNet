@@ -2,8 +2,6 @@ import os
 import numpy as np
 import glob
 import re
-import vtk
-from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 try:
     import tensorflow as tf
     from tensorflow.python.keras import backend as K
@@ -38,6 +36,7 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False):
     return smoothed
 
 def bound_polydata_by_image(image, poly, threshold):
+    import vtk
     bound = vtk.vtkBox()
     image.ComputeBounds()
     b_bound = image.GetBounds()
@@ -52,6 +51,7 @@ def bound_polydata_by_image(image, poly, threshold):
     return clipper.GetOutput()
 
 def decimation(poly, rate):
+    import vtk
     """
     Simplifies a VTK PolyData
     Args: 
@@ -66,7 +66,17 @@ def decimation(poly, rate):
     decimate.Update()
     return decimate.GetOutput()
 
+def get_largest_connected_polydata(poly):
+    import vtk
+    connectivity = vtk.vtkPolyDataConnectivityFilter()
+    connectivity.SetInputData(poly)
+    connectivity.SetExtractionModeToLargestRegion()
+    connectivity.Update()
+    poly = connectivity.GetOutput()
+    return poly
+
 def get_poly_surface_area(poly):
+    import vtk
     mass = vtk.vtkMassProperties()
     mass.SetInputData(poly)
     mass.Update()
@@ -82,6 +92,7 @@ def vtkImageResample(image, spacing, opt):
     Returns:
         image: resampled vtk image data
     """
+    import vtk
     reslicer = vtk.vtkImageReslice()
     reslicer.SetInputData(image)
     if opt=='linear':
@@ -110,6 +121,8 @@ def convertPolyDataToImageData(poly, ref_im):
     Returns:
         output: resulted vtkImageData
     """
+    import vtk
+    from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
     
     ref_im.GetPointData().SetScalars(numpy_to_vtk(np.zeros(vtk_to_numpy(ref_im.GetPointData().GetScalars()).shape)))
     ply2im = vtk.vtkPolyDataToImageStencil()
@@ -140,6 +153,7 @@ import SimpleITK as sitk
     if not spacing:
         spacing = sitkIm.GetSpacing()
     import SimpleITK as sitk
+    import vtk
     img = sitk.GetArrayFromImage(sitkIm).transpose(2,1,0)
     vtkArray = exportPython2VTK(img)
     imageData = vtk.vtkImageData()
@@ -173,6 +187,8 @@ def load_vtk_image(fn, mode='linear'):
     Return:
         label: label map as a vtk image
     """
+    import vtk
+    from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
     name_list = fn.split(os.extsep)
     ext = name_list[-1]
 
@@ -214,6 +230,7 @@ def load_vtk_image(fn, mode='linear'):
     return label
 
 def vtk_write_mask_as_nifty2(mask, image_fn, mask_fn):
+    import vtk
     origin = mask.GetOrigin()
     reader = vtk.vtkNIFTIImageReader()
     reader.SetFileName(image_fn)
@@ -247,6 +264,7 @@ def vtk_write_mask_as_nifty2(mask, image_fn, mask_fn):
     return
 
 def vtk_write_mask_as_nifty(mask,M , image_fn, mask_fn):
+    import vtk
     reader = vtk.vtkNIFTIImageReader()
     reader.SetFileName(image_fn)
     reader.Update()
@@ -283,6 +301,8 @@ def write_vtk_image(vtkIm, fn, M=None):
     Returns:
         None
     """
+    import vtk
+    print("Writing vti with name: ", fn)
     if M is not None:
         M.Invert()
         reslice = vtk.vtkImageReslice()
@@ -306,6 +326,7 @@ def write_vtk_image(vtkIm, fn, M=None):
     return
 
 def appendPolyData(poly_list):
+    import vtk
     appendFilter = vtk.vtkAppendPolyData()
     for poly in poly_list:
         appendFilter.AddInputData(poly)
@@ -314,6 +335,7 @@ def appendPolyData(poly_list):
     return out
 
 def cleanPolyData(poly, tol):
+    import vtk
     clean = vtk.vtkCleanPolyData()
     clean.SetInputData(poly)
     clean.SetTolerance(tol)
@@ -325,19 +347,19 @@ def cleanPolyData(poly, tol):
 
 
 def load_vtk(fn, clean=True,num_mesh=1):
+    import vtk
+    from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
     poly = load_vtk_mesh(fn)    
     if clean:
         poly = cleanPolyData(poly, 0.)
-        write_vtk_polydata(poly, '/Users/fanweikong/Downloads/debug.vtk')
     
-    print("Loading vtk, number of cells: ", poly.GetNumberOfCells())
+    print("Loading vtk, number of cells and points: ", poly.GetNumberOfCells(), poly.GetNumberOfPoints())
     poly2_l = [poly]
     for i in range(1, num_mesh):
         poly2 = vtk.vtkPolyData()
         poly2.DeepCopy(poly)
         poly2_l.append(poly2)
     poly_f = appendPolyData(poly2_l)
-    print("Appending: ", poly_f.GetNumberOfCells())
     coords = vtk_to_numpy(poly_f.GetPoints().GetData())
     cells = vtk_to_numpy(poly_f.GetPolys().GetData())
     cells = cells.reshape(poly_f.GetNumberOfCells(), 4)
@@ -392,6 +414,16 @@ def construct_feed_dict(pkl):
         dense_shape=(pkl[3][0][1].shape[0], pkl[3][0][1].shape[0])) for j in range(len(pkl[3]))]
        
     return feed_dict
+
+def getTrainNLabelNames(data_folder, m, ext='*.nii.gz',fn='_train', seg_fn='_masks'):
+  x_train_filenames = []
+  y_train_filenames = []
+  for subject_dir in sorted(glob.glob(os.path.join(data_folder,m+fn,ext))):
+      x_train_filenames.append(os.path.realpath(subject_dir))
+  try:
+      for subject_dir in sorted(glob.glob(os.path.join(data_folder ,m+fn+seg_fn,ext))):
+          y_train_filenames.append(os.path.realpath(subject_dir))
+  except Exception as e: print(e)
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
@@ -456,6 +488,7 @@ def data_to_tfrecords(X, Y, S,transform, spacing, file_path_prefix=None, verbose
         print("Writing {} done!".format(result_tf_file))
 
 def vtk_marching_cube(vtkLabel, bg_id, seg_id, smooth=None):
+    import vtk
     contour = vtk.vtkDiscreteMarchingCubes()
     contour.SetInputData(vtkLabel)
     contour.SetValue(0, seg_id)
@@ -464,8 +497,24 @@ def vtk_marching_cube(vtkLabel, bg_id, seg_id, smooth=None):
 
     return mesh
 
+def vtk_marching_cube_multi(vtkLabel, bg_id, smooth=None):
+    import vtk
+    from vtk.util.numpy_support import vtk_to_numpy
+    ids = np.unique(vtk_to_numpy(vtkLabel.GetPointData().GetScalars()))
+    ids = np.delete(ids, np.where(ids==bg_id))
+
+    contour = vtk.vtkDiscreteMarchingCubes()
+    contour.SetInputData(vtkLabel)
+    for index, i in enumerate(ids):
+        print("Setting iso-contour value: ", i)
+        contour.SetValue(index, i)
+    contour.Update()
+    mesh = contour.GetOutput()
+
+    return mesh
 
 def load_vtk_mesh(fileName):
+    import vtk
     """
     Loads surface/volume mesh to VTK
     """
@@ -496,6 +545,8 @@ def load_vtk_mesh(fileName):
     return reader.GetOutput()
 
 def load_image_to_nifty(fn):
+    import vtk
+    from vtk.util.numpy_support import vtk_to_numpy
     import SimpleITK as sitk
     _, ext = fn.split(os.extsep, 1)
     if ext=='vti':
@@ -516,12 +567,16 @@ def load_image_to_nifty(fn):
     return label
 
 def exportPython2VTK(img):
+    import vtk
+    from vtk.util.numpy_support import numpy_to_vtk, get_vtk_array_type
+
     vtkArray = numpy_to_vtk(num_array=img.flatten('F'), deep=True, array_type=get_vtk_array_type(img.dtype))
     return vtkArray
 
 
 
 def write_vtk_polydata(poly, fn):
+    import vtk
     print('Writing vtp with name:', fn)
     if (fn == ''):
         return 0
@@ -541,11 +596,22 @@ def write_vtk_polydata(poly, fn):
     return
 
 def write_polydata_points(poly, fn):
+    import vtk
     verts = vtk.vtkVertexGlyphFilter()
     verts.AddInputData(poly)
     verts.Update()
     write_vtk_polydata(verts.GetOutput(), fn)
     return
+
+def write_numpy_points(pts, fn):
+    import vtk
+    from vtk.util.numpy_support import numpy_to_vtk
+    vtkPts = vtk.vtkPoints()
+    vtkPts.SetData(numpy_to_vtk(pts[:,:3]))
+    poly = vtk.vtkPolyData()
+    poly.SetPoints(vtkPts)
+    write_polydata_points(poly, fn)
+    return 
 
 
 def build_transform_matrix(image):
@@ -555,6 +621,7 @@ def build_transform_matrix(image):
     return matrix 
 
 def get_point_normals(poly):
+    import vtk
     norms = vtk.vtkPolyDataNormals()
     norms.SetInputData(poly)
     norms.ComputePointNormalsOn()
@@ -564,4 +631,5 @@ def get_point_normals(poly):
     norms.Update()
     poly = norms.GetOutput()
     pt_norm = poly.GetPointData().GetArray("Normals")
+    from vtk.util.numpy_support import vtk_to_numpy
     return vtk_to_numpy(pt_norm)

@@ -18,7 +18,6 @@ def parse():
     parser.add_argument('--size', nargs='+', type=int, help='Image dimensions')
     parser.add_argument('--folder_postfix', nargs='?', default='_train', help='Folder postfix of the folder to look for')
     parser.add_argument('--out_folder', help='Name of the output folder')
-    parser.add_argument('--attr', help='Attribute of the output folder')
     parser.add_argument('--deci_rate', type=float, default=0., help='Decimation rate of ground truth mesh')
     parser.add_argument('--smooth_iter', type=int, default=50, help='Smoothing iterations for GT mesh')
     parser.add_argument('--seg_id', default=[], type=int, nargs='+', help='List of segmentation ids to apply marching cube')

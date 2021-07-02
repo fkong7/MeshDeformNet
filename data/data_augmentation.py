@@ -22,7 +22,6 @@ def generate_seg_aug_dataset(im_dir, mask_dir, out_dir, modality, mode='train', 
     sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
     
     import glob
-    import utils
     import SimpleITK as sitk
     from pre_process import AffineTransform, NonlinearTransform, resample_spacing
 
