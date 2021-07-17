@@ -1,4 +1,4 @@
-# DeformNet
+# MeshDeformNet
 
 This repository contains the source code for our paper:
 
