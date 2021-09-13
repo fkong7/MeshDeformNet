@@ -17,7 +17,6 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 import tensorflow as tf
 from tensorflow.python.keras import models as models_keras
-
 import SimpleITK as sitk 
 from pre_process import *
 from tensorflow.python.keras import backend as K
@@ -43,8 +42,7 @@ def parse():
     parser.add_argument('--amplify_factor', type=float, default=1., help="amplify_factor of the predicted displacements")
     parser.add_argument('--size', type = int, nargs='+', help='Image dimensions')
     parser.add_argument('--mode', help='Test or validation (without or with ground truth label')
-    parser.add_argument('--num_mesh', type=int, default=1, help='Number of meshes to train')
-    parser.add_argument('--num_seg', type=int, default=8, help='Number of segmentation classes')
+    parser.add_argument('--num_seg', type=int, default=1, help='Number of segmentation classes')
     parser.add_argument('--d_weights', nargs='+', type=float, default=None, help='Weights to down-sample image first')
     parser.add_argument('--ras_spacing',nargs='+', type=float, default=None, help='Prediction spacing')
     parser.add_argument('--seg_id', default=[], type=int, nargs='+', help='List of segmentation ids to apply marching cube')
@@ -67,6 +65,7 @@ class Prediction:
         self.deformnet = DeformNet(**info)
         self.model = self.deformnet.build_keras()
         self.model_name = model_name
+        self.model.summary()
         print("Name: ", self.model_name)
         for layer in self.model.layers:
             layer.trainable = False
@@ -76,7 +75,6 @@ class Prediction:
             os.makedirs(os.path.dirname(self.out_fn))
         except Exception as e: print(e)
          
-    
     def set_image_info(self, modality, image_fn, size, out_fn, mesh_fn=None, d_weights=None, write=False):
         self.modality = modality
         self.image_fn = image_fn
@@ -86,7 +84,6 @@ class Prediction:
         self.size = size
         self.out_fn = out_fn
         # down sample to investigate low resolution
-        #self.image_vol = down_sample_spacing_with_factors(self.image_vol, factor=d_weights)
         if d_weights:
             self.image_vol = resample_spacing(self.image_vol, template_size = (384, 384, 384), order=1)[0]
             self.image_vol = down_sample_to_slice_thickness(self.image_vol, d_weights, order=0)
@@ -113,9 +110,6 @@ class Prediction:
         prediction = self.model.predict(model_inputs)
         end = time.time()
         self.pred_time = end-start
-        #bottleneck prediction
-        #model_bn = self.deformnet.build_encoder()
-        #self.bn =  np.squeeze(model_bn.predict(model_inputs))
         # remove segmentation
         if self.deformnet.num_seg > 0:
             prediction = prediction[1:]
@@ -217,14 +211,6 @@ class Prediction:
         haus_r2p = directed_hausdorff(vtk_to_numpy(ref_poly.GetPoints().GetData()), vtk_to_numpy(pred_poly.GetPoints().GetData()))
         haus[0] = max(haus_p2r, haus_r2p)
 
-        #dir_name = os.path.dirname(self.out_fn)
-        #base_name = os.path.basename(self.out_fn)
-        #fn = os.path.join(dir_name, 'distance_'+base_name+'.vtp')
-        #write_vtk_polydata(dist_poly, fn)
-        #fn = os.path.join(dir_name, 'pred_'+base_name+'.vtp')
-        #write_vtk_polydata(pred_poly, fn)
-        #fn = os.path.join(dir_name, 'ref_'+base_name+'.vtp')
-        #write_vtk_polydata(ref_poly, fn)
         return dist, haus
 
     def write_prediction(self, seg_id, ras_spacing=None):
@@ -259,8 +245,6 @@ class Prediction:
             write_vtk_image(ref_im, os.path.join(dir_name, base_name+'.vti'))
         else:
             vtk_write_mask_as_nifty(ref_im, M, self.image_fn, os.path.join(dir_name, base_name+'.nii.gz'))
-        #write_vtk_image(ref_im, os.path.join(dir_name, base_name+'.vti'))
-        #vtk_write_mask_as_nifty2(ref_im, self.image_fn, os.path.join(dir_name, base_name+'.nii.gz'))
     def get_score(self):
         return self.score
     def get_score_names(self):
@@ -305,7 +289,7 @@ if __name__ == '__main__':
     info = {'batch_size': BATCH_SIZE,
             'input_size': (args.size[0], args.size[1], args.size[2], 1),
             'feed_dict': mesh_info,
-            'num_mesh': args.num_mesh,
+            'num_mesh': len(args.seg_id),
             'num_seg': args.num_seg,
             'amplify_factor': args.amplify_factor
             }

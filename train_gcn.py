@@ -52,7 +52,7 @@ parser.add_argument('--val_data_weights', type=float, nargs='+', help='Weights t
 parser.add_argument('--file_pattern', default='*.tfrecords', help='Pattern of the .tfrecords files')
 parser.add_argument('--modality', nargs='+', help='Name of the modality, mr, ct, split by space')
 parser.add_argument('--num_epoch', type=int, help='Maximum number of epochs to run')
-parser.add_argument('--num_seg', type=int,default=8, help='Number of segmentation classes')
+parser.add_argument('--num_seg', type=int,default=1, help='Number of segmentation classes')
 parser.add_argument('--seg_weight', type=float, default=1., help='Weight of the segmentation loss')
 parser.add_argument('--mesh_ids', nargs='+', type=int, default=[2], help='Number of meshes to train')
 parser.add_argument('--batch_size', type=int, default=10, help='Batch size')
@@ -61,7 +61,6 @@ parser.add_argument('--lr', type=float, help='Learning rate')
 parser.add_argument('--cf_ratio', type=float, default=1., help='Loss ratio between gt chamfer loss and pred chamfer loss')
 parser.add_argument('--size', type = int, nargs='+', help='Image dimensions')
 parser.add_argument('--weights', type = float, nargs='+', help='Loss weights for geometric loss')
-parser.add_argument('--weights_arith', type = float, nargs='+', help='Loss weights for arithmetric loss')
 parser.add_argument('--hidden_dim', type = int, default=128, help='Hidden dimension')
 parser.add_argument('--amplify_factor', type=float, default=1., help="amplify_factor of the predicted displacements")
 args = parser.parse_args()
@@ -102,18 +101,14 @@ for i in range(len(args.mesh_ids)):
 print("Mesh center, scale: ", mesh_info['mesh_center'], mesh_info['mesh_scale'])
 print("Mesh edge: ", mesh_info['edge_length_scaled'])
 
-"""# Build the model"""
-model = DeformNet(args.batch_size, img_shape, mesh_info, amplify_factor=args.amplify_factor,num_mesh=len(args.mesh_ids), num_seg=args.num_seg)
-
 """## Set up train and validation datasets
 Note that we apply image augmentation to our training dataset but not our validation dataset.
 """
 tr_cfg = {'change_intensity': {"scale": [0.9, 1.1],"shift": [-0.1, 0.1]}}
 tr_preprocessing_fn = functools.partial(_augment_deformnet, **tr_cfg)
-val_cfg = {}
 if_seg = True if args.num_seg>0 else False
 
-val_preprocessing_fn = functools.partial(_augment_deformnet, **val_cfg)
+val_preprocessing_fn = functools.partial(_augment_deformnet)
 train_ds_list, val_ds_list = [], []
 train_ds_num, val_ds_num = [], []
 for data_folder_out, attr in zip(args.im_trains, args.attr_trains):
@@ -140,8 +135,8 @@ num_train_examples = train_ds_num[np.argmax(train_data_weights)]/np.max(train_da
 num_val_examples =  val_ds_num[np.argmax(val_data_weights)]/np.max(val_data_weights) 
 print("Number of train, val samples after reweighting: ", num_train_examples, num_val_examples)
 
-
-"""# Build dataset iterator"""
+"""# Build the model"""
+model = DeformNet(args.batch_size, img_shape, mesh_info, amplify_factor=args.amplify_factor,num_mesh=len(args.mesh_ids), num_seg=args.num_seg)
 unet_gcn = model.build_keras()
 unet_gcn.summary(line_length=150)
 
@@ -155,12 +150,10 @@ else:
     losses = [ mesh_loss_geometric_cf(mesh_info, 3, args.weights, args.cf_ratio, mesh_info['edge_length_scaled'][i%len(args.mesh_ids)]) for i in range(len(output_keys))]
 
 losses = dict(zip(output_keys, losses))
-metric_loss = []
-metric_key = []
+metric_loss, metric_key = [], []
 for i in range(1, len(args.mesh_ids)+1):
     metric_key.append(output_keys[-i])
     metric_loss.append(point_loss_cf)
-print(metric_key)
 metrics_losses = dict(zip(metric_key, metric_loss))
 metric_loss_weights = list(np.ones(len(args.mesh_ids)))
 loss_weights = list(np.ones(len(output_keys)))
@@ -171,13 +164,10 @@ if args.num_seg > 0:
 unet_gcn.compile(optimizer=adam, loss=losses,loss_weights=loss_weights,  metrics=metrics_losses)
 """ Setup model checkpoint """
 save_model_path = os.path.join(args.output, "weights_gcn.hdf5")
-#save_model_path2 = os.path.join(args.output,  "weights_gcn-{epoch:02d}.hdf5")
 
 cp_cd = SaveModelOnCD(metric_key, save_model_path, patience=50)
 lr_schedule = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.8, patience=10, min_lr=0.000005)
 call_backs = [cp_cd,lr_schedule]
-# Alternatively, load the weights directly: model.load_weights(save_model_path)
-
 
 try:
     if args.pre_train != '':

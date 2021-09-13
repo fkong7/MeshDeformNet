@@ -20,7 +20,7 @@ Our method demonstrated promising performance of generating high-resolution and 
 
 ## Data Augmentation
 
-Data augmentation were applied on the training data. Specifically, we applied random scaling, random rotation, random shearing as well as elastic deformations. The augmemtation script can run in parallel using MPI.
+Data augmentation were applied on the training data. Specifically, we applied random scaling, random rotation, random shearing as well as elastic deformations. The augmemtation script can run in parallel using MPI. For Section3.1-3.5, we used `--num 10` and `--num 20` for CT and MR data, respective. For Section 3.6, we used `--num 60` for both CT and MR images.
 
 ```
 mpirun -n 20 python data/data_augmentation.py.py \
@@ -49,22 +49,20 @@ python data/data2tfrecords.py --folder /path/to/top/image/directory \
 
 ## Training
 
-Comming soon...
-
 The template mesh and the relavant mesh information (e.g. Laplacian matrix) required for training/testing are stored in mesh_data/init.vtp and mesh_data/deformnet_aux.dat. To use a different template sphere mesh or to use different number of spheres, you woule need to run `make_auxiliary_dat_file.py`. For example:
 
 ```
 python make_auxiliary_dat_file.py --template_fn mesh_data/init.vtp --num_meshes 7 --output /path/to/output
 ```
 
-You would need to use the following script to start training. Our pre-trained weights can be downloaded at: .
+You would need to use the following script to start training. Our pre-trained weights are in `weights/weights_gcn.hdf5`.
 
 ```
 python train_gcn.py \
     --im_train /path/to/top/tfrecords/directory \
     --im_val /path/to/top/tfrecords/directory \
-    --mesh_txt mesh_data/ct_mesh_info.txt  mesh_data/mr_mesh_info.txt \ # template mesh initialization
-    --mesh mesh_data/deformnet_aux.dat \ # template mesh data
+    --mesh_txt  data/template/mesh_info_ct.txt data/template/mesh_info_mr.txt \ # template mesh initialization
+    --mesh data/template/data_aux.dat \ # template mesh data
     --attr_trains '' \ # specify name of different validation dataset (i.e. '' _aug for ct_train, ct_train_aug)
     --attr_vals '' \ # specify names of different validation dataset (i.e. '' _aug for ct_val, ct_val_aug)
     --train_data_weights 1. \ # weights for different training dataset
@@ -77,29 +75,25 @@ python train_gcn.py \
     --size 128 128 128 \ # input dimension
     --weights 0.29336324 0.05 0.46902252 0.16859047 \ # weights for point, laplacian, normal edge losses 
     --mesh_ids 0 1 2 3 4 5 6 \ # ids of cardiac structures, starts at 0
-    --num_seg 1 \ # number of class for segmentation output, 1 for binary segmentation
+    --num_seg 1 \ # number of class for segmentation output, 1 for binary segmentation, 0 to turn off the segmentation module.
     --seg_weight 100. # weight on segmentation loss
 ```
 
 ## Prediction
-
-Comming soon...
 
 You would need to use the following script to generate predictions.
 
 ```
 python prediction_gcn.py \
     --image /path/to/top/image/directory \
-    --mesh_dat mesh_data/deformnet_aux.dat \
-    --mesh_txt mesh_data/ct_mesh_info.txt  mesh_data/mr_mesh_info.txt \
+    --mesh_dat data/template/data_aux.dat \
+    --mesh_txt data/template/mesh_info_ct.txt data/template/mesh_info_mr.txt \
     --attr _test \ # name of folder where image data are stored: (i.e. /path/to/top/image/directory/ct_test)
-    --mesh_tmplt  mesh_data/init_7.vtp \
-    --model /path/to/model/weights_gcn.hdf5 \
+    --mesh_tmplt  data/template/init3.vtk \
+    --model weights/weights_gcn.hdf5 \
     --output /path/to/output \
     --modality ct mr \
     --seg_id 1 2 3 4 5 6 7\ # segmentation ids, 1-7 for seven cardiac structures
     --size 128 128 128 \ # input dimension
-    --mode test  \ # test - generate predictions only; validate - also compute accuracy metrics
-    --num_mesh 7 \  # number of meshes
-    --num_seg 1  # number of class for segmentation output, 1 for binary segmentation
+    --mode test  # test - generate predictions only; validate - also compute accuracy metrics
 ```
