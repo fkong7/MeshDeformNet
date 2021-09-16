@@ -179,7 +179,7 @@ except Exception as e:
 
 """ Training """
 history =unet_gcn.fit(train_ds, 
-                   steps_per_epoch=int(np.ceil(500./float(args.batch_size))),
+                   steps_per_epoch=int(np.ceil(num_train_examples/float(args.batch_size))),
                    epochs=args.num_epoch,
                    validation_data=val_ds,
                    validation_steps= int(np.ceil(num_val_examples / float(args.batch_size))),
