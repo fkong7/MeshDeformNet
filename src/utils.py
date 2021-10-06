@@ -15,6 +15,7 @@ import os
 import numpy as np
 import glob
 import re
+import vtk
 try:
     import tensorflow as tf
     from tensorflow.python.keras import backend as K
