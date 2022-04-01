@@ -12,12 +12,6 @@ Our method demonstrated promising performance of generating high-resolution and 
 
 <img width="550" alt="examples" src="https://user-images.githubusercontent.com/31931939/122882003-993fa080-d2f0-11eb-8599-4d476b082f18.png"> <img width="260" alt="4dct2-_1_" src="https://user-images.githubusercontent.com/31931939/122882976-93968a80-d2f1-11eb-99b4-41a30a2ca2ee.gif">
 
-## Dependencies
-
-- Tensorflow V 1.14
-- SimpleITK 
-- VTK
-
 ## Data Augmentation
 
 Data augmentation were applied on the training data. Specifically, we applied random scaling, random rotation, random shearing as well as elastic deformations. The augmemtation script can run in parallel using MPI. For Section3.1-3.5, we used `--num 10` and `--num 20` for CT and MR data, respectively. For Section 3.6, we used `--num 60` for both CT and MR images.
