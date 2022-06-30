@@ -21,7 +21,7 @@ try:
     from mpi4py import MPI
 except Exception as e: print(e)
 
-def generate_seg_aug_dataset(im_dir, mask_dir, out_dir, modality, mode='train', AUG_NUM=10,comm=None,rank=0):
+def generate_seg_aug_dataset(im_dir, mask_dir, scar_dir, out_dir, modality, mode='train', AUG_NUM=10,comm=None,rank=0):
     params_affine = {
             'scale_range': [0.75, 1.],
             'rot_range': [-5., 5.],
@@ -43,70 +43,84 @@ def generate_seg_aug_dataset(im_dir, mask_dir, out_dir, modality, mode='train', 
     if rank == 0:
         try:
             os.makedirs(os.path.join(out_dir, modality+'_%s' % mode))
-            os.makedirs(os.path.join(out_dir, modality+'_%s_seg' % mode))
+            os.makedirs(os.path.join(out_dir, modality+'_%s_masks' % mode))
+            os.makedirs(os.path.join(out_dir, modality+'_%s_scar_masks' % mode))
         except Exception as e: print(e)
         fns = sorted(glob.glob(os.path.join(im_dir, '*.nii.gz'))+
             glob.glob(os.path.join(im_dir, '*.nii')))
         fns_masks = sorted(glob.glob(os.path.join(mask_dir, '*.nii.gz'))+
             glob.glob(os.path.join(mask_dir, '*.nii')))
-        fns_all = []
-        fns_all_masks = []
+        fns_scar_masks = sorted(glob.glob(os.path.join(scar_dir, '*.nii.gz'))+
+            glob.glob(os.path.join(scar_dir, '*.nii')))
+        fns_all, fns_all_masks, fns_all_scar_masks = [], [], []
         nums = []
         for i in range(AUG_NUM):
             fns_all += fns
             fns_all_masks += fns_masks
+            fns_all_scar_masks += fns_scar_masks
             nums += [i] * len(fns)
-        if comm is None:
-            comm_size = 1
-        else:
-            comm_size = comm.Get_size()
+
+        comm_size = 1 if comm is None else comm.Get_size()
+        
         fns_scatter = [None] * comm_size 
         fns_masks_scatter = [None] * comm_size
+        fns_scar_masks_scatter = [None] * comm_size
         nums_scatter = [None] * comm_size
         chunck_size = len(fns_all) // comm_size
+        
         for i in range(comm_size):
             if i == comm_size-1:
                 fns_scatter[i] = fns_all[i*chunck_size:]
                 fns_masks_scatter[i] = fns_all_masks[i*chunck_size:]
+                fns_scar_masks_scatter[i] = fns_all_scar_masks[i*chunck_size:]
                 nums_scatter[i] = nums[i*chunck_size:]
             else:
                 fns_scatter[i] = fns_all[i*chunck_size:(i+1)*chunck_size]
                 fns_masks_scatter[i] = fns_all_masks[i*chunck_size:(i+1)*chunck_size]
+                fns_scar_masks_scatter[i] = fns_all_scar_masks[i*chunck_size:(i+1)*chunck_size]
                 nums_scatter[i] = nums[i*chunck_size:(i+1)*chunck_size]
     else:
-        nums_scatter, fns_masks_scatter, fns_scatter = None, None, None
-        fns_all, fns_all_mask, nums = None, None, None
+        nums_scatter, fns_masks_scatter, fns_scar_masks_scatter, fns_scatter = None, None, None, None
+        fns_all, fns_all_mask, fns_all_scar_masks, nums = None, None, None, None
+    
     if comm is not None:
         nums_scatter = comm.scatter(nums_scatter, root = 0)
         fns_masks_scatter = comm.scatter(fns_masks_scatter, root = 0)
+        fns_scar_masks_scatter = comm.scatter(fns_scar_masks_scatter, root = 0)
         fns_scatter  = comm.scatter(fns_scatter, root = 0)
-    for fn, fn_mask, aug_id in zip(fns_scatter, fns_masks_scatter, nums_scatter):
+
+    for fn, fn_mask, fn_scar_mask, aug_id in zip(fns_scatter, fns_masks_scatter, fns_scar_masks_scatter, nums_scatter):
         name = os.path.basename(fn).split(os.extsep, 1)[0]
         name_seg = os.path.basename(fn_mask).split(os.extsep, 1)[0]
         assert name == name_seg , "Image and mask file names do not match!"
         image = sitk.ReadImage(fn)
         mask = sitk.ReadImage(fn_mask)
+        scar_mask = sitk.ReadImage(fn_scar_mask)
        
-        params_bspline['mask'] = mask
-        params_affine['mask'] = mask
-        
         affine = AffineTransform(image, **params_affine)
         bspline = NonlinearTransform(image, **params_bspline)
         
         bspline.bspline()
-        output = bspline.apply_transform()
+        aug_im = bspline.apply_transform(image, order=1)
+        aug_mask = bspline.apply_transform(mask, order=0)
+        aug_scar_mask = bspline.apply_transform(scar_mask, order=0)
         
-        affine.set_input(*output)
         affine.affine()
-        output = affine.apply_transform()
+        aug_im = affine.apply_transform(aug_im, order=1)
+        aug_mask = affine.apply_transform(aug_mask, order=0)
+        aug_scar_mask = affine.apply_transform(scar_mask, order=0)
+        
         affine.clear_transform()
         bspline.clear_transform()
         
         im_out = os.path.join(out_dir, modality+'_%s' % mode, name+'_'+str(aug_id)+'.nii.gz')
-        mask_out = os.path.join(out_dir, modality+'_%s_seg' % mode, name+'_'+str(aug_id)+'.nii.gz')
-        sitk.WriteImage(output[0], im_out)
+        mask_out = os.path.join(out_dir, modality+'_%s_masks' % mode, name+'_'+str(aug_id)+'.nii.gz')
+        scar_mask_out = os.path.join(out_dir, modality+'_%s_scar_masks' % mode, name+'_'+str(aug_id)+'.nii.gz')
         
-        mask_aug_py = sitk.GetArrayFromImage(output[1])
+        sitk.WriteImage(aug_im, im_out)
+        sitk.WriteImage(aug_scar_mask, scar_mask_out)
+        
+        mask_aug_py = sitk.GetArrayFromImage(aug_mask)
         for i in np.unique(mask_aug_py):
             tmp = mask_aug_py==i
             true_im = sitk.GetImageFromArray(tmp.astype(np.uint8))
@@ -116,15 +130,14 @@ def generate_seg_aug_dataset(im_dir, mask_dir, out_dir, modality, mode='train', 
             true_im_py = sitk.GetArrayFromImage(out)
             mask_aug_py[true_im_py==1] = i
         mask_aug = sitk.GetImageFromArray(mask_aug_py)
-        mask_aug.SetOrigin(output[0].GetOrigin())
-        mask_aug.SetSpacing(output[0].GetSpacing())
-        mask_aug.SetDirection(output[0].GetDirection())
+        mask_aug.CopyInformation(aug_im)
         sitk.WriteImage(mask_aug, mask_out)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--im_dir', help='Name of the folder with image data')
-    parser.add_argument('--seg_dir', help='Name of the folder with segmentation data')
+    parser.add_argument('--seg_dir', help='Name of the folder with la segmentation data')
+    parser.add_argument('--scar_dir', help='Name of the folder with scar segmentation data')
     parser.add_argument('--out_dir', help='Name of the output directory')
     parser.add_argument('--modality', help='Modality, ct or mr')
     parser.add_argument('--mode', help='train or val')
@@ -139,4 +152,4 @@ if __name__ == '__main__':
         comm = None
         rank = 0
 
-    generate_seg_aug_dataset(args.im_dir, args.seg_dir, args.out_dir, args.modality, args.mode,args.num,  comm, rank)
+    generate_seg_aug_dataset(args.im_dir, args.seg_dir, args.scar_dir, args.out_dir, args.modality, args.mode,args.num,  comm, rank)

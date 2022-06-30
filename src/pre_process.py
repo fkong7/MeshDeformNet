@@ -172,34 +172,8 @@ class SpatialTransform(object):
         self.mesh = mesh
         self.transform = sitk.Transform()  
         self.ref = image if ref is None else ref
-    def set_input(self, image, mask=None, mesh=None):
-        self.image = image
-        self.dim = image.GetDimension()
-        if mask is not None:
-            self.mask = mask
-        if mesh is not None:
-            self.mesh = mesh
     def clear_transform(self):
         self.transform = sitk.Transform()
-    def apply_transform(self):
-        output = []
-        out_im = transform_func(self.image, self.ref, self.transform, order=1)
-        output.append(out_im)
-        if self.mask is not None:
-            out_mask = transform_func(self.mask, self.ref, self.transform, order=0)
-            output.append(out_mask)
-        if self.mesh is not None:
-            #out_mesh = np.copy(self.mesh)
-            #Had to do a copy like this not sure why
-            out_mesh = np.zeros(self.mesh.shape)
-            #inv = self.transform.GetInverse()
-            for i in range(self.mesh.shape[0]):
-                out_mesh[i,:] = self.mesh[i,:]
-                out_mesh[i,:] = self.transform.TransformPoint(out_mesh[i,:])
-
-            print("Mesh difference: ", np.mean(out_mesh, axis=0) - np.mean(self.mesh, axis=0))
-            output.append(out_mesh)
-        return output
     def add_transform(self, transform):
         total = sitk.Transform(self.transform)
         total.AddTransform(transform)
@@ -268,26 +242,20 @@ class AffineTransform(SpatialTransform):
         self.scale()
         self.translate()
         #self.flip()
-    def apply_transform(self):
-        output = []
-        out_im = transform_func(self.image, self.ref, self.transform, order=1)
-        output.append(out_im)
-        if self.mask is not None:
-            out_mask = transform_func(self.mask, self.ref, self.transform, order=0)
-            output.append(out_mask)
-        if self.mesh is not None:
-            #out_mesh = np.copy(self.mesh)
-            #Had to do a copy like this not sure why
-            out_mesh = np.zeros(self.mesh.shape)
-            #We have to use a inv transform on the points - it's SimpleITK's decision that
-            #the resampling transform on image is defined from output to input
-            inv = self.transform.GetInverse()
-            for i in range(self.mesh.shape[0]):
-                out_mesh[i,:] = self.mesh[i,:]
-                out_mesh[i,:] = inv.TransformPoint(out_mesh[i,:])
+    def apply_transform(self, image, order):
+        out_im = transform_func(image, self.ref, self.transform, order=order)
+        return out_im
 
-            output.append(out_mesh)
-        return output
+    def apply_transform_on_mesh(self, mesh):
+        #Had to do a copy like this not sure why
+        out_mesh = np.zeros(self.mesh.shape)
+        #We have to use a inv transform on the points - it's SimpleITK's decision that
+        #the resampling transform on image is defined from output to input
+        inv = self.transform.GetInverse()
+        for i in range(self.mesh.shape[0]):
+            out_mesh[i,:] = self.mesh[i,:]
+            out_mesh[i,:] = inv.TransformPoint(out_mesh[i,:])
+        return out_mesh
 
 class NonlinearTransform(SpatialTransform):
     '''
@@ -317,29 +285,24 @@ class NonlinearTransform(SpatialTransform):
         params += d.flatten(order='F')                                                      
         self.transform.SetParameters(tuple(params))
  
-    def apply_transform(self):
+    def apply_transform(self, image, order):
         from scipy.optimize import minimize
-        output = []
-        out_im = transform_func(self.image, self.ref, self.transform, order=1)
-        output.append(out_im)
-        if self.mask is not None:
-            out_mask = transform_func(self.mask, self.ref, self.transform, order=0)
-            output.append(out_mask)
-        if self.mesh is not None:
-            #out_mesh = np.copy(self.mesh)
-            #Had to do a copy like this not sure why
-            out_mesh = np.zeros(self.mesh.shape)
-            #We have to use a inv transform on the points - it's SimpleITK's decision that
-            #the resampling transform on image is defined from output to input
-            for i in range(self.mesh.shape[0]):
-                out_mesh[i,:] = self.mesh[i,:]
-                def fun(x):
-                    return np.linalg.norm(self.transform.TransformPoint(x) - out_mesh[i,:])
-                p = np.array(out_mesh[i,:])
-                res = minimize(fun, p, method='Powell')
-                out_mesh[i,:] = res.x
-            output.append(out_mesh)
-        return output
+        out_im = transform_func(image, self.ref, self.transform, order=order)
+        return out_im
+
+    def apply_transform_on_mesh(self, mesh):
+        #Had to do a copy like this not sure why
+        out_mesh = np.zeros(self.mesh.shape)
+        #We have to use a inv transform on the points - it's SimpleITK's decision that
+        #the resampling transform on image is defined from output to input
+        for i in range(self.mesh.shape[0]):
+            out_mesh[i,:] = self.mesh[i,:]
+            def fun(x):
+                return np.linalg.norm(self.transform.TransformPoint(x) - out_mesh[i,:])
+            p = np.array(out_mesh[i,:])
+            res = minimize(fun, p, method='Powell')
+            out_mesh[i,:] = res.x
+        return out_mesh
 
 
 def swapLabels_ori(labels):
