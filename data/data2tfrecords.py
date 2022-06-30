@@ -177,6 +177,7 @@ def data_preprocess(modality,data_folder, data_folder_out, fn, intensity, size, 
                 data_to_tfrecords(*tfrecords, output_path.split('.nii.gz')[0] + '_{}'.format(aug_n), verbose=True)
         # Save centroid and radius for mesh initialization
         info_fn = os.path.join(data_folder_out, m+fn, 'mesh_info.txt')
+        print("WRITING INITIALIZATION INTO: ", info_fn)
         np.savetxt(info_fn, np.hstack((mesh_ctr, np.expand_dims(mesh_scale, -1), np.expand_dims(mesh_area,-1))))
 
 if __name__=='__main__':

@@ -62,18 +62,19 @@ def unit(tensor):
 def mesh_loss_geometric_cf(feed_dict, block_id, weights, cf_ratio, edge_length):
     def loss(y_true, y_pred):
         losses = mesh_loss(y_pred, y_true, feed_dict, block_id, cf_ratio, edge_length)
-        point_loss, edge_loss, normal_loss, laplace_loss = losses
+        point_loss, edge_loss, normal_loss, laplace_loss, scar_loss = losses
         total_loss = tf.pow(point_loss*100, weights[0])*tf.pow(laplace_loss*100, weights[1]) \
-                *tf.pow(normal_loss*100, weights[2])*tf.pow(edge_loss*100, weights[3])
+                *tf.pow(normal_loss*100, weights[2])*tf.pow(edge_loss*100, weights[3]) + scar_loss * weights[4]
         return total_loss
     return loss
 
 def point_loss_cf(y_true, y_pred):
     gt_pt = y_true[:, :, :3]
-    pred_shape = y_pred.get_shape().as_list()
-    dist1,idx1,dist2,idx2 = nn_distance(gt_pt, y_pred)
+    pred_pt = y_pred[:, :, :3] * 128
+    dist1,idx1,dist2,idx2 = nn_distance(gt_pt, pred_pt)
     point_loss = tf.reduce_mean(dist1) + tf.reduce_mean(dist2)
     return point_loss
+
 
 def laplacian_loss(feed_dict, block_id):
     def k_laplacian_loss(y_true, y_pred):
@@ -120,24 +121,44 @@ def normal_loss(feed_dict, block_id):
 
 def mesh_loss(pred, gt, feed_dict, block_id, cf_ratio=1., edge_thresh=[0.,0.,0.]):
     gt_pt = gt[:, :, :3] # gt points
-    gt_nm = gt[:, :, 3:] # gt normals
+    gt_nm = gt[:, :, 3:6] # gt normals
+    gt_scar = gt[:, :, -1] # gt scar
 
+    pred_pt = pred[:, :, :3]*128. # pred points
+    pred_scar = pred[:, :, -1] # pred scar
+
+    
     # chafmer distance
-    dist1,idx1,dist2,idx2 = nn_distance(gt_pt, pred)
+    dist1,idx1,dist2,idx2 = nn_distance(gt_pt, pred_pt)
     point_loss = cf_ratio/(cf_ratio+1.)*2*tf.reduce_mean(dist1) + 1./(cf_ratio+1.)*2*tf.reduce_mean(dist2)
+    
+    # scar cross entropy
+    #print("DEBUG: pred_scar ", pred_scar.get_shape().as_list())
+    #print("DEBUG: gt_scar", gt_scar.get_shape().as_list())
+    #print("DEBUG: idx1", idx1)
+    #print("DEBUG: idx1", idx1.get_shape())
+    #print("DEBUG: idx1", idx1.get_shape().as_list())
+    gt2pred_scar_gather = tf.gather(pred_scar, idx1, axis=-1)
+    pred2gt_scar_gather = tf.gather(gt_scar, idx2, axis=-1)
+    gt2pred_scar_gather = tf.clip_by_value(tf.sigmoid(gt2pred_scar_gather), 1e-6, 1.-1e-6)
+    pred2gt_scar_gather = tf.clip_by_value(tf.sigmoid(pred2gt_scar_gather), 1e-6, 1.-1e-6)
+    scar_loss_p2g = losses.binary_crossentropy(pred_scar, pred2gt_scar_gather)
+    scar_loss_g2p = losses.binary_crossentropy(gt_scar, gt2pred_scar_gather)
+    scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
+
     
     # normal cosine loss
     # edge in graph
-    nod1 = tf.gather(pred, feed_dict['edges'][block_id-1][:,0], axis=1)
-    nod2 = tf.gather(pred, feed_dict['edges'][block_id-1][:,1], axis=1)
+    nod1 = tf.gather(pred_pt, feed_dict['edges'][block_id-1][:,0], axis=1)
+    nod2 = tf.gather(pred_pt, feed_dict['edges'][block_id-1][:,1], axis=1)
     edge = tf.subtract(nod2, nod1)
     edge_length = tf.reduce_sum(tf.square(edge), axis=-1)
     edge_loss = tf.reduce_mean(tf.abs(edge_length-edge_thresh[block_id-1]))
     #edge_loss = tf.reduce_mean(tf.square(edge_length-edge_thresh[block_id-1]))
     ## normal cosine loss
-    v1 = tf.gather(pred, feed_dict['faces'][block_id-1][:,0], axis=1)
-    v2 = tf.gather(pred, feed_dict['faces'][block_id-1][:,1], axis=1)
-    v3 = tf.gather(pred, feed_dict['faces'][block_id-1][:,2], axis=1)
+    v1 = tf.gather(pred_pt, feed_dict['faces'][block_id-1][:,0], axis=1)
+    v2 = tf.gather(pred_pt, feed_dict['faces'][block_id-1][:,1], axis=1)
+    v3 = tf.gather(pred_pt, feed_dict['faces'][block_id-1][:,2], axis=1)
     idx_n = tf.gather(idx2, feed_dict['faces'][block_id-1][:,0], axis=1)
     cross = tf.linalg.cross(v2-v1, v3-v1)
 
@@ -151,10 +172,10 @@ def mesh_loss(pred, gt, feed_dict, block_id, cf_ratio=1., edge_thresh=[0.,0.,0.]
     # normal loss weighted by face area
     normal_loss = tf.reduce_mean(tf.reduce_sum(tf.square(unit(normal)-unit(cross)), axis=-1))
     
-    lap = laplace_coord(pred, feed_dict, block_id)
+    lap = laplace_coord(pred_pt, feed_dict, block_id)
     laplace_loss = tf.reduce_mean(tf.reduce_sum(tf.square(lap), -1))
     
-    return point_loss, edge_loss, normal_loss, laplace_loss
+    return point_loss, edge_loss, normal_loss, laplace_loss, scar_loss
 
 def dice_coeff(y_true, y_pred):
     smooth = 1.

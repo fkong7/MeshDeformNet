@@ -67,8 +67,8 @@ def _parse_function_all(mode):
             parsed_features = tf.parse_single_example(example_proto, features)
             mesh = tf.sparse_tensor_to_dense(parsed_features["Y_"+mesh_id])
 
-            node_num = tf.cast(tf.shape(mesh)[0]/6, tf.int32)
-            mesh = tf.reshape(mesh, tf.stack([node_num, 6 ]))
+            node_num = tf.cast(tf.shape(mesh)[0]/7, tf.int32)
+            mesh = tf.reshape(mesh, tf.stack([node_num, 7 ]))
             return mesh
         elif mode=='transform':
             features = {"Transform": tf.VarLenFeature(tf.float32)}
