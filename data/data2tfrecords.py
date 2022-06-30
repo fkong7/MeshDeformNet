@@ -111,12 +111,12 @@ def process_la_scar_image(image, scar_mask, la_mask, size, m, intensity, seg_id,
     pt_arr = numpy_to_vtk(scar_arr)
     pt_arr.SetName('Scar')
     mesh.GetPointData().AddArray(pt_arr)
-    #normed_scar_mask = sitk.GetImageFromArray(scar_py.astype(np.uint8).transpose(2,1,0))
-    #normed_scar_mask.SetSpacing([0.25, 0.25, 0.25])
+    normed_scar_mask = sitk.GetImageFromArray(scar_py.astype(np.uint8).transpose(2,1,0))
+    normed_scar_mask.SetSpacing([0.25, 0.25, 0.25])
     #normed_im = sitk.GetImageFromArray(network_input[0].transpose(2,1,0))
     #write_vtk_image(exportSitk2VTK(normed_scar_mask)[0], '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/scar_mask.vti')
     #write_vtk_image(exportSitk2VTK(normed_im)[0], '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/image.vti')
-    return network_input, mesh_all_list
+    return network_input, mesh_all_list, normed_scar_mask
 
 def process_image_w_random_crops(image, mask, size, m, intensity, seg_id, deci_rate, smooth_iter):
     ori_size = np.array(image.GetSize())
@@ -132,13 +132,16 @@ def process_image_w_random_crops(image, mask, size, m, intensity, seg_id, deci_r
 
 def data_preprocess(modality,data_folder, data_folder_out, fn, intensity, size, seg_id, deci_rate, smooth_iter, aug_num=0):
     for m in modality:
-        imgVol_fn , seg_fn = [], []
+        imgVol_fn, scar_fn, seg_fn = [], [], []
         for subject_dir in natural_sort(glob.glob(os.path.join(data_folder,m+fn,'*.nii.gz')) \
                 +glob.glob(os.path.join(data_folder,m+fn,'*.nii')) ):
             imgVol_fn.append(os.path.realpath(subject_dir))
-        for subject_dir in natural_sort(glob.glob(os.path.join(data_folder,m+fn+'_seg','*.nii.gz')) \
-                +glob.glob(os.path.join(data_folder,m+fn+'_seg','*.nii')) ):
+        for subject_dir in natural_sort(glob.glob(os.path.join(data_folder,m+fn+'_masks','*.nii.gz')) \
+                +glob.glob(os.path.join(data_folder,m+fn+'_masks','*.nii')) ):
             seg_fn.append(os.path.realpath(subject_dir))
+        for subject_dir in natural_sort(glob.glob(os.path.join(data_folder,m+fn+'_scar_masks','*.nii.gz')) \
+                +glob.glob(os.path.join(data_folder,m+fn+'_scar_masks','*.nii')) ):
+            scar_fn.append(os.path.realpath(subject_dir))
         print("number of training data %d" % len(imgVol_fn))
         print("number of training data segmentation %d" % len(seg_fn))
         assert len(seg_fn) == len(imgVol_fn)
@@ -149,17 +152,21 @@ def data_preprocess(modality,data_folder, data_folder_out, fn, intensity, size, 
         num_fns = len(imgVol_fn)
         for i in range(num_fns):
             output_path =  os.path.join(data_folder_out, m+fn, os.path.basename(imgVol_fn[i]))
-            img_path, seg_path = imgVol_fn[i], seg_fn[i]
+            img_path, seg_path, scar_path = imgVol_fn[i], seg_fn[i], scar_fn[i]
             assert os.path.basename(img_path).split('.')[0] == os.path.basename(seg_path).split('.')[0], "Incosistent image and seg name"
-            tfrecords, mesh_all_list = process_image(sitk.ReadImage(img_path), sitk.ReadImage(seg_path), size, m, intensity, seg_id, deci_rate, smooth_iter)
+            
+            tfrecords, mesh_all_list, normed_scar_mask = process_la_scar_image(sitk.ReadImage(img_path), sitk.ReadImage(scar_path), sitk.ReadImage(seg_path), \
+                    size, m, intensity, seg_id, deci_rate, smooth_iter)
+            
             # compute centroid and radius for mesh initialization 
             for s, (mesh_poly, mesh_py) in enumerate(zip(mesh_all_list, tfrecords[1])):
                 mesh_area[s] = mesh_area[s] + get_poly_surface_area(mesh_poly)/num_fns/np.mean(np.array(size))/np.mean(np.array(size))
                 mesh_ctr[s] = mesh_ctr[s] + np.mean(mesh_py[:,:3], axis=0)/num_fns/np.array(size)
                 mesh_scale[s] += np.mean(np.linalg.norm(mesh_py[:,:3]-np.mean(mesh_py[:,:3], axis=0), axis=-1))/num_fns/np.mean(np.array(size))
             mesh_all = appendPolyData(mesh_all_list)
-            #write_vtk_polydata(mesh_all, output_path.split('.nii.gz')[0] +'_ID'+'_'.join(map(str,seg_id))+'.vtp')
-            #sitk.WriteImage(sitk.GetImageFromArray(tfrecords[2].astype(np.uint8).transpose(2,1,0)), output_path)
+            write_vtk_polydata(mesh_all, output_path.split('.nii.gz')[0] +'_ID'+'_'.join(map(str,seg_id))+'.vtp')
+            write_vtk_image(exportSitk2VTK(sitk.GetImageFromArray(tfrecords[2].astype(np.uint8).transpose(2,1,0)))[0], output_path.split('.nii.gz')[0]+'.vti')
+            write_vtk_image(exportSitk2VTK(normed_scar_mask)[0], output_path.split('.nii.gz')[0]+'_scar.vti')
             #sitk.WriteImage(sitk.GetImageFromArray(tfrecords[0].transpose(2,1,0)), output_path.split('.nii.gz')[0]+'_im.nii.gz')
             data_to_tfrecords(*tfrecords, output_path.split('.nii.gz')[0], verbose=True)
             # Random crops - not used in paper

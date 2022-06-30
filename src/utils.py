@@ -341,6 +341,8 @@ def write_vtk_image(vtkIm, fn, M=None):
 
 def appendPolyData(poly_list):
     import vtk
+    if len(poly_list) == 1:
+        return poly_list[0]
     appendFilter = vtk.vtkAppendPolyData()
     for poly in poly_list:
         appendFilter.AddInputData(poly)
