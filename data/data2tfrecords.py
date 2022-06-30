@@ -82,6 +82,42 @@ def process_image(image, mask, size, m, intensity, seg_id, deci_rate, smooth_ite
     seg_py = swapLabels_ori(sitk.GetArrayFromImage(segVol).transpose(2, 1, 0).astype(np.int64))
     return [img_py, mesh_all_py_list, seg_py, transform, spacing], mesh_all_list
 
+def map_scar_to_mesh(scar_mask_py, transform, mesh_coords, scar_id=1):
+    # mesh coords are in the physical coordinate system for more accurate mapping
+    from scipy.spatial import KDTree
+    scar_arr = np.zeros(mesh_coords.shape[0])
+    tree = KDTree(mesh_coords)
+    
+    scar_vox = np.array(np.where(scar_mask_py==scar_id))
+    scar_vox_coords = scar_vox.transpose() / 4. # 512//128=4
+    distance, indices = tree.query(scar_vox_coords)
+    scar_arr[indices] = 1.
+    print("Maximum, average and minimum mapping distances are: ", np.max(distance), np.mean(distance), np.min(distance))
+    return scar_arr
+
+
+def process_la_scar_image(image, scar_mask, la_mask, size, m, intensity, seg_id, deci_rate, smooth_iter):
+    network_input, mesh_all_list = process_image(image, la_mask, size, m, intensity, seg_id, deci_rate, smooth_iter)
+    
+    scar_mask = resample_spacing(scar_mask, template_size=[512, 512, 512], order=0)[0] 
+    scar_py = swapLabels_ori(sitk.GetArrayFromImage(scar_mask).transpose(2, 1, 0).astype(np.int64))
+
+    ID = 0 # scar for LA only
+    mesh_all_list_py = network_input[1]
+    mesh = mesh_all_list[ID]
+    scar_arr = map_scar_to_mesh(scar_py, build_transform_matrix(scar_mask), vtk_to_numpy(mesh.GetPoints().GetData())) 
+    mesh_all_list_py[ID] = np.concatenate((mesh_all_list_py[ID], np.expand_dims(scar_arr, axis=-1)), axis=-1)
+    # write image for debugging
+    pt_arr = numpy_to_vtk(scar_arr)
+    pt_arr.SetName('Scar')
+    mesh.GetPointData().AddArray(pt_arr)
+    #normed_scar_mask = sitk.GetImageFromArray(scar_py.astype(np.uint8).transpose(2,1,0))
+    #normed_scar_mask.SetSpacing([0.25, 0.25, 0.25])
+    #normed_im = sitk.GetImageFromArray(network_input[0].transpose(2,1,0))
+    #write_vtk_image(exportSitk2VTK(normed_scar_mask)[0], '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/scar_mask.vti')
+    #write_vtk_image(exportSitk2VTK(normed_im)[0], '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/image.vti')
+    return network_input, mesh_all_list
+
 def process_image_w_random_crops(image, mask, size, m, intensity, seg_id, deci_rate, smooth_iter):
     ori_size = np.array(image.GetSize())
     # origin at [0, 1/3], size in [0.75 1]
@@ -146,4 +182,11 @@ if __name__=='__main__':
             os.mkdir(os.path.join(args.out_folder, m+args.folder_postfix))
         except Exception as e: print(e)
     data_preprocess(args.modality,args.folder, args.out_folder,args.folder_postfix, args.intensity, args.size, args.seg_id, args.deci_rate, args.smooth_iter, args.aug_num)
+    # testing
+    #image_fn = '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/enhanced.nii.gz'
+    #scar_fn = '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/scarSegImgM.nii.gz'
+    #la_fn = '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/atriumSegImgMO.nii.gz'
+    #m = process_la_scar_image(sitk.ReadImage(image_fn), sitk.ReadImage(scar_fn), sitk.ReadImage(la_fn), [128, 128, 128], \
+    #        'mr', [750,-750], [1], 0.2, 25)[-1]
+    #write_vtk_polydata(m, '/Users/fanweikong/Downloads/dataset/task1/train_data/train_1/mesh.vtp')
 

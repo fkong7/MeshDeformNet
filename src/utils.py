@@ -34,6 +34,7 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False):
     Returns:
         smoothed: smoothed vtk polydata
     """
+    import vtk
 
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(poly)
