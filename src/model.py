@@ -90,7 +90,7 @@ class DeformNet(object):
     def _split_and_concate(self, mesh_coords, gcn_output, block_id):
         mesh_vert_num = mesh_coords.get_shape().as_list()[1]
         output_coords = layers.Lambda(lambda x: x[:, :, :3], name='coords'+str(block_id))(gcn_output)
-        output_scar = layers.Lambda(lambda x: x[:, :, 3], name='scar'+str(block_id))(gcn_output)
+        output_scar = layers.Lambda(lambda x: x[:, :, 3]*256., name='scar'+str(block_id))(gcn_output)
         output_coords = layers.Add()([mesh_coords, ScalarMul(self.amplify_factor/256.)(output_coords)])
         output_total = layers.Concatenate(axis=-1)([output_coords, layers.Reshape((mesh_vert_num, 1))(output_scar)])
         return output_coords, output_total

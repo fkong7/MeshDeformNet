@@ -169,9 +169,9 @@ save_model_path = os.path.join(args.output, "weights_gcn.hdf5")
 
 cp_cd = SaveModelOnCD(metric_key, save_model_path, patience=50)
 cp = tf.keras.callbacks.ModelCheckpoint(filepath=save_model_path, monitor='val_loss', save_best_only=True, verbose=1)
-lr_schedule = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.8, patience=100, min_lr=0.000005)
-#call_backs = [cp_cd,lr_schedule]
-call_backs = [lr_schedule]
+lr_schedule = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.8, patience=10, min_lr=0.000005)
+call_backs = [cp_cd,lr_schedule]
+#call_backs = [lr_schedule]
 
 try:
     if args.pre_train != '':
