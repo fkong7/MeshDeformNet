@@ -118,9 +118,11 @@ class Prediction:
         for i in range(BLOCK_NUM): # block number 
             mesh_list = []
             for k in range(num):
-                pred = prediction[i*num+k]
-                pred = np.squeeze(pred)
-                pred = pred * np.array(self.size)/np.array([128, 128, 128])
+                pred_t = prediction[i*num+k]
+                pred_t = np.squeeze(pred_t)
+                scar = pred_t[:, -1]
+                pred = pred_t[:, :3]
+                pred = pred * np.array(self.size)
                 pred = np.concatenate((pred,np.ones((pred.shape[0],1))), axis=-1)  
                 pred = np.matmul(transform, pred.transpose()).transpose()[:,:3]
                 pred = pred + self.img_center - self.img_center2
@@ -128,6 +130,9 @@ class Prediction:
                 new_mesh = vtk.vtkPolyData()
                 new_mesh.DeepCopy(self.mesh_tmplt)
                 new_mesh.GetPoints().SetData(numpy_to_vtk(pred))
+                scar_arr = numpy_to_vtk((scar>0.).astype(int))
+                scar_arr.SetName('scar')
+                new_mesh.GetPointData().AddArray(scar_arr)
                 print("num points: ", new_mesh.GetNumberOfPoints())
                 print("num cells: ", new_mesh.GetNumberOfCells())
                 mesh_list.append(new_mesh)

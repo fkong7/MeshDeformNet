@@ -34,7 +34,7 @@ from custom_layers import *
 from augmentation import change_intensity_img, _augment_deformnet
 from dataset import get_baseline_dataset, get_baseline_dataset_deformnet
 from model import DeformNet 
-from loss import mesh_loss_geometric_cf, point_loss_cf, binary_bce_dice_loss
+from loss import mesh_loss_geometric_cf, point_loss_cf, binary_bce_dice_loss, scar_loss
 from call_backs import *
 """# Set up"""
 
@@ -153,7 +153,9 @@ losses = dict(zip(output_keys, losses))
 metric_loss, metric_key = [], []
 for i in range(1, len(args.mesh_ids)+1):
     metric_key.append(output_keys[-i])
-    metric_loss.append(point_loss_cf)
+    #metric_key.append(output_keys[-i])
+    metric_loss.append([point_loss_cf, scar_loss])
+    #metric_loss.append(scar_loss)
 metrics_losses = dict(zip(metric_key, metric_loss))
 metric_loss_weights = list(np.ones(len(args.mesh_ids)))
 loss_weights = list(np.ones(len(output_keys)))
@@ -166,8 +168,10 @@ unet_gcn.compile(optimizer=adam, loss=losses,loss_weights=loss_weights,  metrics
 save_model_path = os.path.join(args.output, "weights_gcn.hdf5")
 
 cp_cd = SaveModelOnCD(metric_key, save_model_path, patience=50)
-lr_schedule = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.8, patience=10, min_lr=0.000005)
-call_backs = [cp_cd,lr_schedule]
+cp = tf.keras.callbacks.ModelCheckpoint(filepath=save_model_path, monitor='val_loss', save_best_only=True, verbose=1)
+lr_schedule = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.8, patience=100, min_lr=0.000005)
+#call_backs = [cp_cd,lr_schedule]
+call_backs = [lr_schedule]
 
 try:
     if args.pre_train != '':

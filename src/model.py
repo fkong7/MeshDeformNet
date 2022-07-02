@@ -90,7 +90,7 @@ class DeformNet(object):
     def _split_and_concate(self, mesh_coords, gcn_output, block_id):
         mesh_vert_num = mesh_coords.get_shape().as_list()[1]
         output_coords = layers.Lambda(lambda x: x[:, :, :3], name='coords'+str(block_id))(gcn_output)
-        output_scar = layers.Lambda(lambda x: x[:, :, -1], name='scar'+str(block_id))(gcn_output)
+        output_scar = layers.Lambda(lambda x: x[:, :, 3], name='scar'+str(block_id))(gcn_output)
         output_coords = layers.Add()([mesh_coords, ScalarMul(self.amplify_factor/256.)(output_coords)])
         output_total = layers.Concatenate(axis=-1)([output_coords, layers.Reshape((mesh_vert_num, 1))(output_scar)])
         return output_coords, output_total
@@ -101,21 +101,19 @@ class DeformNet(object):
        input_size = [float(i) for  i in list(self.input_size)]
        output =  GraphConv(coord_dim, 384, act=tf.nn.relu,adjs=adjs[2])(mesh_coords)
        output = Projection([3,4], input_size)([i for i in features]+[mesh_coords, output])
-       output1, output_cat = self._graph_conv_block(output, adjs[2], output.get_shape().as_list()[-1], 288, coord_dim, 3)
+       output1, output_cat = self._graph_conv_block(output, adjs[2], output.get_shape().as_list()[-1], 288, coord_dim+1, 3)
        output1_coords, output1_total = self._split_and_concate(mesh_coords, output1, 1)
        
        # repeat for number of meshes
        
        output =  GraphConv(output_cat.get_shape().as_list()[-1], 144, act=tf.nn.relu,adjs=adjs[2])(output_cat)
        output = Projection([1,2], input_size)([i for i in features]+[output1_coords, output])
-       output2, output_cat = self._graph_conv_block(output, adjs[2], output.get_shape().as_list()[-1], 96, coord_dim, 3)
-       output2 = layers.Add()([output1, ScalarMul(self.amplify_factor/256.)(output2)])
+       output2, output_cat = self._graph_conv_block(output, adjs[2], output.get_shape().as_list()[-1], 96, coord_dim+1, 3)
        output2_coords, output2_total = self._split_and_concate(output1_coords, output2, 2)
 
        output =  GraphConv(output_cat.get_shape().as_list()[-1], 64, act=tf.nn.relu,adjs=adjs[2])(output_cat)
-       output = Projection([0,1], input_size)([i for i in features]+[output2, output])
-       output3, _ = self._graph_conv_block(output, adjs[2], output.get_shape().as_list()[-1], 32, coord_dim, 3)
-       output3 = layers.Add()([output2, ScalarMul(self.amplify_factor/256.)(output3)])
+       output = Projection([0,1], input_size)([i for i in features]+[output2_coords, output])
+       output3, _ = self._graph_conv_block(output, adjs[2], output.get_shape().as_list()[-1], 32, coord_dim+1, 3)
        output3_coords, output3_total = self._split_and_concate(output2_coords, output3, 3)
        
        if self.num_mesh > 1:

@@ -75,6 +75,24 @@ def point_loss_cf(y_true, y_pred):
     point_loss = tf.reduce_mean(dist1) + tf.reduce_mean(dist2)
     return point_loss
 
+def scar_loss(y_true, y_pred):
+    gt_pt = y_true[:, :, :3]
+    gt_scar = y_true[:, :, 3]
+
+    pred_pt = y_pred[:, :, :3]*128
+    pred_scar = tf.sigmoid(y_pred[:, :, -1])
+    
+    dist1,idx1,dist2,idx2 = nn_distance(gt_pt, pred_pt)
+    
+    # scar cross entropy
+    gt2pred_scar_gather = tf.gather(pred_scar, idx1, axis=-1)
+    pred2gt_scar_gather = tf.gather(gt_scar, idx2, axis=-1)
+    gt2pred_scar_gather = tf.clip_by_value(gt2pred_scar_gather, 1e-6, 1.-1e-6)
+    pred2gt_scar_gather = tf.clip_by_value(pred2gt_scar_gather, 1e-6, 1.-1e-6)
+    scar_loss_p2g = losses.binary_crossentropy(pred_scar, pred2gt_scar_gather)
+    scar_loss_g2p = losses.binary_crossentropy(gt_scar, gt2pred_scar_gather)
+    scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
+    return scar_loss
 
 def laplacian_loss(feed_dict, block_id):
     def k_laplacian_loss(y_true, y_pred):
@@ -126,6 +144,8 @@ def mesh_loss(pred, gt, feed_dict, block_id, cf_ratio=1., edge_thresh=[0.,0.,0.]
 
     pred_pt = pred[:, :, :3]*128. # pred points
     pred_scar = pred[:, :, -1] # pred scar
+    #pred_scar = tf.Print(pred_scar, [pred_scar], summarize=100)
+    pred_scar = tf.sigmoid(pred_scar)
 
     
     # chafmer distance
@@ -140,8 +160,8 @@ def mesh_loss(pred, gt, feed_dict, block_id, cf_ratio=1., edge_thresh=[0.,0.,0.]
     #print("DEBUG: idx1", idx1.get_shape().as_list())
     gt2pred_scar_gather = tf.gather(pred_scar, idx1, axis=-1)
     pred2gt_scar_gather = tf.gather(gt_scar, idx2, axis=-1)
-    gt2pred_scar_gather = tf.clip_by_value(tf.sigmoid(gt2pred_scar_gather), 1e-6, 1.-1e-6)
-    pred2gt_scar_gather = tf.clip_by_value(tf.sigmoid(pred2gt_scar_gather), 1e-6, 1.-1e-6)
+    gt2pred_scar_gather = tf.clip_by_value(gt2pred_scar_gather, 1e-6, 1.-1e-6)
+    pred2gt_scar_gather = tf.clip_by_value(pred2gt_scar_gather, 1e-6, 1.-1e-6)
     scar_loss_p2g = losses.binary_crossentropy(pred_scar, pred2gt_scar_gather)
     scar_loss_g2p = losses.binary_crossentropy(gt_scar, gt2pred_scar_gather)
     scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
