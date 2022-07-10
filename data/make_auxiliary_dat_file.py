@@ -141,7 +141,6 @@ def fix_polydata_normals(poly):
     return poly
 
 def create_data_aux(template_path, num_mesh, out_dir):
-    num_mesh = 7
     TEMPLATE_NAME = 'sphere_coarse.vtp' 
     try:
         os.makedirs(out_dir)
@@ -206,9 +205,9 @@ def create_data_aux(template_path, num_mesh, out_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--template_path', default='./template/sphere.vtp')
-    parser.add_argument('--num_mesh', default=7, type=int)
-    parser.add_argument('--out_dir', default='./template')
+    parser.add_argument('--template_fn', default='./template/sphere.vtp')
+    parser.add_argument('--num_meshes', default=7, type=int)
+    parser.add_argument('--output', default='./template')
     args = parser.parse_args()
 
-    create_data_aux(args.template_path, args.num_mesh, args.out_dir)
+    create_data_aux(args.template_fn, args.num_meshes, args.output)

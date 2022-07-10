@@ -12,15 +12,9 @@ Our method demonstrated promising performance of generating high-resolution and 
 
 <img width="550" alt="examples" src="https://user-images.githubusercontent.com/31931939/122882003-993fa080-d2f0-11eb-8599-4d476b082f18.png"> <img width="260" alt="4dct2-_1_" src="https://user-images.githubusercontent.com/31931939/122882976-93968a80-d2f1-11eb-99b4-41a30a2ca2ee.gif">
 
-## Dependencies
-
-- Tensorflow V 1.14
-- SimpleITK 
-- VTK
-
 ## Data Augmentation
 
-Data augmentation were applied on the training data. Specifically, we applied random scaling, random rotation, random shearing as well as elastic deformations. The augmemtation script can run in parallel using MPI. For Section3.1-3.5, we used `--num 10` and `--num 20` for CT and MR data, respective. For Section 3.6, we used `--num 60` for both CT and MR images.
+Data augmentation were applied on the training data. Specifically, we applied random scaling, random rotation, random shearing as well as elastic deformations. The augmemtation script can run in parallel using MPI. For Section3.1-3.5, we used `--num 10` and `--num 20` for CT and MR data, respectively. For Section 3.6, we used `--num 60` for both CT and MR images.
 
 ```
 mpirun -n 20 python data/data_augmentation.py.py \
@@ -49,10 +43,10 @@ python data/data2tfrecords.py --folder /path/to/top/image/directory \
 
 ## Training
 
-The template mesh and the relavant mesh information (e.g. Laplacian matrix) required for training/testing are stored in mesh_data/init.vtp and mesh_data/deformnet_aux.dat. To use a different template sphere mesh or to use different number of spheres, you woule need to run `make_auxiliary_dat_file.py`. For example:
+The template mesh and the relavant mesh information (e.g. Laplacian matrix) required for training/testing are stored in data/template/init3.vtk and data/template/data_aux.dat. To use a different template sphere mesh or to use different number of spheres, you woule need to run `make_auxiliary_dat_file.py`. For example:
 
 ```
-python make_auxiliary_dat_file.py --template_fn mesh_data/init.vtp --num_meshes 7 --output /path/to/output
+python make_auxiliary_dat_file.py --template_fn data/template/init3.vtk --num_meshes 7 --output /path/to/output
 ```
 
 You would need to use the following script to start training. Our pre-trained weights are in `weights/weights_gcn.hdf5`.
@@ -63,8 +57,8 @@ python train_gcn.py \
     --im_val /path/to/top/tfrecords/directory \
     --mesh_txt  data/template/mesh_info_ct.txt data/template/mesh_info_mr.txt \ # template mesh initialization
     --mesh data/template/data_aux.dat \ # template mesh data
-    --attr_trains '' \ # specify name of different validation dataset (i.e. '' _aug for ct_train, ct_train_aug)
-    --attr_vals '' \ # specify names of different validation dataset (i.e. '' _aug for ct_val, ct_val_aug)
+    --attr_trains '' \ # specify name of different validation dataset (e.g. '' _aug for ct_train, ct_train_aug)
+    --attr_vals '' \ # specify names of different validation dataset (e.g. '' _aug for ct_val, ct_val_aug)
     --train_data_weights 1. \ # weights for different training dataset
     --val_data_weights 1. \ # weights for different validation dataset
     --output /path/to/output \
@@ -73,7 +67,7 @@ python train_gcn.py \
     --batch_size 1 \
     --lr 0.001 \
     --size 128 128 128 \ # input dimension
-    --weights 0.29336324 0.05 0.46902252 0.16859047 \ # weights for point, laplacian, normal edge losses 
+    --weights 0.29336324 0.05 0.46902252 0.16859047 \ # weights for point, laplacian, normal, and edge losses 
     --mesh_ids 0 1 2 3 4 5 6 \ # ids of cardiac structures, starts at 0
     --num_seg 1 \ # number of class for segmentation output, 1 for binary segmentation, 0 to turn off the segmentation module.
     --seg_weight 100. # weight on segmentation loss
