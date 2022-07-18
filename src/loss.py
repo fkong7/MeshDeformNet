@@ -64,7 +64,7 @@ def mesh_loss_geometric_cf(feed_dict, block_id, weights, cf_ratio, edge_length):
         losses = mesh_loss(y_pred, y_true, feed_dict, block_id, cf_ratio, edge_length)
         point_loss, edge_loss, normal_loss, laplace_loss, scar_loss = losses
         total_loss = tf.pow(point_loss*100, weights[0])*tf.pow(laplace_loss*100, weights[1]) \
-                *tf.pow(normal_loss*100, weights[2])*tf.pow(edge_loss*100, weights[3]) + scar_loss * weights[4]
+                *tf.pow(normal_loss*100, weights[2])*tf.pow(edge_loss*100, weights[3]) + tf.pow(scar_loss*100,  weights[4])
         return total_loss
     return loss
 
@@ -98,14 +98,14 @@ def scar_loss(y_true, y_pred):
     # scar cross entropy
     
     gt2pred_scar_gather = tf.squeeze(tf.gather(pred_scar, idx1, axis=-1), axis=1)
-    #pred2gt_scar_gather = tf.squeeze(tf.gather(gt_scar, idx2, axis=-1), axis=1)
+    pred2gt_scar_gather = tf.squeeze(tf.gather(gt_scar, idx2, axis=-1), axis=1)
     #gt2pred_scar_gather = tf.clip_by_value(gt2pred_scar_gather, 1e-6, 1.-1e-6)
     #pred2gt_scar_gather = tf.clip_by_value(pred2gt_scar_gather, 1e-6, 1.-1e-6)
 
     # pred2gt_scar_gather = tf.Print(pred2gt_scar_gather, [tf.shape(gt_scar), tf.shape(gt2pred_scar_gather), tf.shape(pred_scar), tf.shape(pred2gt_scar_gather)])
-    #scar_loss_p2g = focal_loss(pred2gt_scar_gather, pred_scar)
+    scar_loss_p2g = focal_loss(pred2gt_scar_gather, pred_scar, alpha=0.75)
     scar_loss_g2p = focal_loss(gt_scar, gt2pred_scar_gather, alpha=0.75)
-    #scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
+    scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
     scar_loss = scar_loss_g2p
     return scar_loss
 
@@ -174,14 +174,14 @@ def mesh_loss(pred, gt, feed_dict, block_id, cf_ratio=1., edge_thresh=[0.,0.,0.]
     #print("DEBUG: idx1", idx1.get_shape())
     #print("DEBUG: idx1", idx1.get_shape().as_list())
     gt2pred_scar_gather = tf.squeeze(tf.gather(pred_scar, idx1, axis=-1), axis=1)
-    #pred2gt_scar_gather = tf.squeeze(tf.gather(gt_scar, idx2, axis=-1), axis=1)
+    pred2gt_scar_gather = tf.squeeze(tf.gather(gt_scar, idx2, axis=-1), axis=1)
     #gt2pred_scar_gather = tf.clip_by_value(gt2pred_scar_gather, 1e-6, 1.-1e-6)
     #pred2gt_scar_gather = tf.clip_by_value(pred2gt_scar_gather, 1e-6, 1.-1e-6)
-    #scar_loss_p2g = focal_loss(pred2gt_scar_gather, pred_scar)
-    scar_loss_g2p = focal_loss(gt_scar, gt2pred_scar_gather, alpha=0.9)
+    scar_loss_p2g = focal_loss(pred2gt_scar_gather, pred_scar, alpha=0.75)
+    scar_loss_g2p = focal_loss(gt_scar, gt2pred_scar_gather, alpha=0.75)
     #scar_loss_p2g = losses.binary_crossentropy(pred_scar, pred2gt_scar_gather)
     #scar_loss_g2p = losses.binary_crossentropy(gt_scar, gt2pred_scar_gather)
-    #scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
+    scar_loss = 0.5 * scar_loss_p2g + 0.5 * scar_loss_g2p
     scar_loss = scar_loss_g2p
 
     
