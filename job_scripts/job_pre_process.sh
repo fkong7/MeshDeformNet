@@ -34,11 +34,11 @@ module load cudnn/7.5
 source ~/tf1/bin/activate  # sh, bash, or zsh
 export LD_LIBRARY_PATH=/global/software/sl-7.x86_64/modules/langs/gcc/6.3.0/lib64:$LD_LIBRARY_PATH
 #im_dir=/global/scratch/users/fanwei_kong/DeepLearning/ImageData/LAScar/task1/augmentation
-im_dir=/global/scratch/users/fanwei_kong/DeepLearning/ImageData/LAScar/task1
+im_dir=/global/scratch/users/fanwei_kong/DeepLearning/ImageData/LAScar/task1/cropped
 python data/data2tfrecords.py --folder ${im_dir} \
     --modality mr \
     --size 128 128 128 \
-    --folder_postfix _val \
+    --folder_postfix _train_debug \
     --deci_rate 0 \
     --smooth_ite 25 \
     --out_folder ${im_dir}/processed \

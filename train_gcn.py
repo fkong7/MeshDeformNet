@@ -118,7 +118,7 @@ for data_folder_out, attr in zip(args.im_trains, args.attr_trains):
             shuffle_buffer=args.shuffle_buffer_size, if_seg=if_seg)
     train_ds_list.append(train_ds_i)
 for data_val_folder_out, attr in zip(args.im_vals, args.attr_vals):
-    x_val_filenames_i = buildImageDataset(data_val_folder_out, args.modality, 41, mode='_val'+attr, ext=args.file_pattern)
+    x_val_filenames_i = buildImageDataset(data_val_folder_out, args.modality, 41, mode='_train'+attr, ext=args.file_pattern)
     val_ds_num.append(len(x_val_filenames_i))
     val_ds_i = get_baseline_dataset_deformnet(x_val_filenames_i, preproc_fn=val_preprocessing_fn, mesh_ids=args.mesh_ids, \
             shuffle_buffer=args.shuffle_buffer_size, if_seg=if_seg)

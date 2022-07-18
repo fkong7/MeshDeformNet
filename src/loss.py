@@ -78,9 +78,9 @@ def point_loss_cf(y_true, y_pred):
 def focal_loss(y_true, y_pred, gamma=2., alpha=0.25):
     pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
     pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
-    pt_0 = tf.Print(pt_0, [y_true, y_pred], summarize=50)
-    pt_0 = tf.Print(pt_0, [tf.reduce_sum(y_true)])
-    pt_0 = tf.Print(pt_0, [tf.reduce_min(pt_1), tf.reduce_mean(pt_1), tf.reduce_max(pt_1), tf.reduce_min(pt_0), tf.reduce_mean(pt_0), tf.reduce_max(pt_0)])
+    #pt_0 = tf.Print(pt_0, [y_true, y_pred], summarize=50)
+    #pt_0 = tf.Print(pt_0, [tf.reduce_sum(y_true)])
+    #pt_0 = tf.Print(pt_0, [tf.reduce_min(pt_1), tf.reduce_mean(pt_1), tf.reduce_max(pt_1), tf.reduce_min(pt_0), tf.reduce_mean(pt_0), tf.reduce_max(pt_0)])
     return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1+K.epsilon())) - K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0 + K.epsilon()))
 
 
@@ -161,7 +161,7 @@ def mesh_loss(pred, gt, feed_dict, block_id, cf_ratio=1., edge_thresh=[0.,0.,0.]
     pred_scar = pred[:, :, -1] # pred scar
     #pred_scar = tf.Print(pred_scar, [pred_scar], summarize=100)
     pred_scar = tf.sigmoid(pred_scar)
-    pred_scar = tf.Print(pred_scar, [pred_scar, pred[:, :, -1]], summarize=100, message='AFTER AND BEFORE SIGMOID')
+    #pred_scar = tf.Print(pred_scar, [pred_scar, pred[:, :, -1]], summarize=100, message='AFTER AND BEFORE SIGMOID')
     
     # chafmer distance
     dist1,idx1,dist2,idx2 = nn_distance(gt_pt, pred_pt)
