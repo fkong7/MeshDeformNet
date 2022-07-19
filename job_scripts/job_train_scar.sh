@@ -38,7 +38,7 @@ source ~/tf1/bin/activate  # sh, bash, or zsh
 export LD_LIBRARY_PATH=/global/software/sl-7.x86_64/modules/langs/gcc/6.3.0/lib64:$LD_LIBRARY_PATH
 export HDF5_USE_FILE_LOCKING='FALSE'
 out_dir=/global/scratch/users/fanwei_kong/DeepLearning/3DPixel2Mesh
-exp_id=LAScar/2022-6-30/scar_all_blocks_wt100
+exp_id=LAScar/2022-7-17/scar_all_blocks_focalAlpha075pow07
 dir=/global/scratch/users/fanwei_kong/DeepLearning/ImageData/LAScar/task1/
 python train_gcn.py \
     --im_train ${dir}/augmentation/processed \
@@ -53,9 +53,9 @@ python train_gcn.py \
     --modality mr \
     --num_epoch 500 \
     --batch_size 1 \
-    --lr 0.0005 \
+    --lr 0.001 \
     --size 128 128 128 \
-    --weights 0.29336324 0.05 0.46902252 0.16859047 100. \
+    --weights 0.29336324 0.05 0.46902252 0.16859047 0.7 \
     --mesh_ids 0 \
     --seg_weight 100
     #--attr_trains _single \
