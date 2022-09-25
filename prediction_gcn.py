@@ -145,13 +145,11 @@ class Prediction:
                 print(weights)
        
     def evaluate_dice(self):
-        from prediction import dice_score
         print("Evaluating dice: ", self.image_fn, self.mesh_fn)
         ref_im = sitk.ReadImage(self.mesh_fn)
         ref_im, M = exportSitk2VTK(ref_im)
         ref_im_py = swapLabels_ori(vtk_to_numpy(ref_im.GetPointData().GetScalars()))
         pred_im_py = vtk_to_numpy(self.seg_result.GetPointData().GetScalars())
-        print("DEBUG: ", np.unique(pred_im_py), np.unique(ref_im_py))
         dice_values = dice_score(pred_im_py, ref_im_py)
         return dice_values
     

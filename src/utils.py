@@ -26,6 +26,22 @@ def natural_sort(l):
     alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
     return sorted(l, key = alphanum_key)
 
+def dice_score(pred, true):
+    pred = pred.astype(np.int)
+    true = true.astype(np.int)
+    num_class = np.unique(true)
+
+    #change to one hot
+    dice_out = [None]*len(num_class)
+    for i in range(1, len(num_class)):
+        pred_c = pred == num_class[i]
+        true_c = true == num_class[i]
+        dice_out[i] = np.sum(pred_c*true_c)*2.0 / (np.sum(pred_c) + np.sum(true_c))
+
+    mask =( pred > 0 )+ (true > 0)
+    dice_out[0] = np.sum((pred==true)[mask]) * 2. / (np.sum(pred>0) + np.sum(true>0))
+    return dice_out
+
 def smooth_polydata(poly, iteration=25, boundary=False, feature=False):
     """
     This function smooths a vtk polydata
